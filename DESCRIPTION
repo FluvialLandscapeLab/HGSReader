@@ -1,0 +1,11 @@
+Package: HGSReader
+Type: Package
+Title: Reads output from the HydroGeoSphere model into R
+Version: 0.1.0
+Author: Geoffrey Poole
+Maintainer: Geoffrey Poole <gpoole@montana.edu>
+Description: The model HydroGeoSphere creates complex output files that are difficult to decipher.  This package allows R to read results from HGS model runs into R for analysis and visualization.
+License: MIT
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.1.1

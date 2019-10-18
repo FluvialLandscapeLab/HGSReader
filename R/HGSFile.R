@@ -189,7 +189,8 @@ HGSFileBody.pm = function(x, taggedLines) {
     # bStart is a vector of lines numbers representing the start of each block
     bStart = taggedLines$line[subset$zones],
     # bEnd is a vector of lines number representing the start of the next block
-    bEnd = c(taggedLines$line[subset$zones][-1], fileEnd)
+    bEnd = c(taggedLines$line[subset$zones][-1], fileEnd),
+    SIMPLIFY = F
   )
 
   # The following code determines the dimensions of the HGS space, assuming it's

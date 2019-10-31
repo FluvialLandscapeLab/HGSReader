@@ -1,3 +1,12 @@
+#' @export
+print.HGSFile = function(x) {
+  cat("HGS file with ", length(x$blocks), " data block", ifelse(length(x$blocks)>1, "s", ""), "\n", sep = "")
+  cat("  Source file: ", x$fileInfo$path, "\n")
+  cat("  Last modified: ", paste(x$fileInfo$mtime) , "\n", sep = "")
+  cat("  Variables: '", paste(x$variables, collapse = "', '"), "'\n", sep = "")
+  cat("  Model dimensions: ", paste0(names(x$dims), " = ", x$dims, collapse = ", "), " nodes", sep = "")
+}
+
 # gets the value that tag key rows in an HGS output file.  These tags are defined in .onload().
 
 getTags = function(fileType, tagNames = NULL) {

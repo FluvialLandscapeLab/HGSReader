@@ -1,45 +1,67 @@
 #' Get data values from HGS files
 #'
-#' Returns the data values associated with each node in an HGS model.
+#' Returns the data values associated with node nodes or cells in an HGS model.
 #'
 #' @param HGSFile An S3 object of class "HGSFile" created by calling
 #'   \code{\link{HGSFile}}.
 #'
-#' @param variables A character vector containing valid variable names.  The
-#'   valid variable names are stored in the HGSFile object and cans be displayed
+#' @param variables A character vector containing valid variable names.
+#'   Valid variable names are stored in the HGSFile object and can be displayed
 #'   with <HGSFile>$variables, where <HGSFile> is the name of the HGSFile
 #'   object.
 #'
-#' @param blockNumber,solutionTime Specify one of these two variables to return
-#'   data from a particular model time step that was output from HydroGeoSphere.
-#'   Use blockNumber to specify a serial number of the output block (e.g., 1, 2,
-#'   3, 4, etc.).  Use solutionTime to specify the specific solution time.
-#'   (Note: Available solutionTimes are stored in HGSFile objects and can be
-#'   accessed using the \code{\link{HGSQueryBlocks}} function with
-#'   "SOLUTIONTIME" as a descriptor).
+#' @param blockNumber,solutionTime Specify one, but only one, of these two
+#'   variables to choose the time step from which data should be retrieved. Use
+#'   blockNumber to specify an index of the times steps that were output (e.g.,
+#'   to get data from the first time step that was output, specify '1', for the
+#'   second '2', etc.). Use solutionTime to specify the solution time from which
+#'   to retrieve data. (Note: Available solutionTimes are stored in the HGSFile
+#'   object and can be accessed using the \code{\link{HGSQueryBlocks}} function
+#'   with "SOLUTIONTIME" as a descriptor).
 #'
-#' @param X,Y,Z The index (i.e., the node number, not the spatial coordinates)
-#'   of nodes to be returned in each dimension.  Setting one or two of these
-#'   parameters involkes "slicing", returning either a vector or a matrix
-#'   representing an axis or a slice through the model.  See "Value" section,
-#'   below, for behavior depending on how many parameters are set.
+#' @param X,Y,Z The index (i.e., '1' for first node or cell, '2' for second,
+#'   etc., not the spatial coordinates) of the node or cell to be returned in each
+#'   dimension. Setting one or two of these parameters invokes "slicing" of
+#'   model output, returning either a vector representing an axis or a matrix representing
+#'   a slice through the model. See "Value" section, below, for behavior
+#'   depending on how many parameters are set.
 #'
 #' @param includeCoords Set to T to include the X, Y, Z coordinates associated
-#'   with the selected variable.  Presently, this feature only works for
-#'   node-centered variables such as head and Depth2GWT.  A future release may
-#'   work with
+#'   with the selected variable.
 #'
 #' @return Either a data.frame, a vector, or a matrix, depending on the values
-#'   for X, Y, and Z.
+#'   for X, Y, and Z.  Importantly, the values of X, Y, and Z are index values
+#'   for nodes.  For instance, Z=1 would specify the bottom-most layer of nodes
+#'   (for node-centered data) or cells (for cell-centered data) in the model,
+#'   regardless of the actual spatial coordinates of the nodes/cells.
+#'
+#'   if X, Y, and Z are all omitted (or specified as integer(0)), the return
+#'   value is a data.frame of all values associated with nodes (for
+#'   node-centered data) or cells (for cell centered data).  Setting
+#'   "includeCoords" will include in the data.frame the spatial coordinates of
+#'   each value.
+#'
+#'   If only one value for X, Y, or Z is specified, a matrix is returned, which
+#'   represents a 2D slice (plane) through the model at the specified node or
+#'   cell index.  If two of the three values X, Y, and Z are specified, the
+#'   result is a vector representing a 1D axis through the model at the
+#'   specified node (or cell) indicies.  Only one model variable can be
+#'   requested in a slice or axis.  If more than one variable is requested, or
+#'   if includeCoords is TRUE when X, Y, or Z is specified, an error results.
 #'
 #'   HGSGetData will return a data.frame when no values are passed for X, Y, and
-#'   Z (or X, Y, and Z are all equal to integer(0)).  The
-#'   data.frame columns will contain the values for the variables requested,
-#'   along with the x, y, and z coordinates (in spatial units used to run HGS)
-#'   if includeCoords is TRUE.
+#'   Z (or X, Y, and Z are all equal to integer(0)).  The data.frame columns
+#'   will contain the values for the variables requested, along with the x, y,
+#'   and z coordinates (in spatial units used to run HGS) if includeCoords is
+#'   TRUE.
 #'
 #' @export
+#'
+#'
+# ARGH! Axis with multiple variables crashes!!!
+#
 HGSGetData = function(HGSFile, variables, blockNumber = NULL, solutionTime = NULL, X = integer(0), Y = integer(0), Z = integer(0), includeCoords = F) {
+  # few checks of parameters
   if(is.null(solutionTime) && is.null(blockNumber)) stop("You must specify either the solution time or the block number associated with the data retrieval.")
   if(is.null(blockNumber)) {
     blockNumber = which(sapply(HGSFile$blocks, function(x) x$SOLUTIONTIME == solutionTime))
@@ -50,12 +72,13 @@ HGSGetData = function(HGSFile, variables, blockNumber = NULL, solutionTime = NUL
   if(blockNumber > length(HGSFile$blocks)) stop("You requested blockNumber ", blockNumber, ", but there are only ", length(HGSFile$blocks), "in the specified HGSFile.")
   dm = HGSFile$blocks[[blockNumber]]$DATAMAP
   badVars = !(variables %in% row.names(dm))
-  if(any(badVars)) stop("The following variables were requested by not found: '", paste0(variables[badVars], collapse = "', '"), "'")
-  if(includeCoords) variables = unique(c(c("X", "Y", "Z"), variables))
+  if(any(badVars)) stop("The following variables were requested by not found in the specified block: '", paste0(variables[badVars], collapse = "', '"), "'")
 
   varDm = dm[variables,]
   varLocs = unique(varDm$varLocation)
-  if(length(varLocs) > 1) stop("Requested variables are not at the same model location.\n", paste0("    '", rownames(varDm), "' is ", varDm$varLocation, "\n"))
+  if(length(varLocs) > 1) {
+    stop("Requested variables are not at the same model location.\n", paste0("    '", rownames(varDm), "' is ", varDm$varLocation, "\n"))
+  }
 
   requestedData =
     as.data.frame(
@@ -65,29 +88,90 @@ HGSGetData = function(HGSFile, variables, blockNumber = NULL, solutionTime = NUL
           function(v) {
             skip = dm[v, "skip"]
             nlines = dm[v, "nlines"]
-            scan(file = HGSFile$fileInfo$path, skip = skip, nlines = nlines)
+            scan(file = HGSFile$fileInfo$path, skip = skip, nlines = nlines, quiet = T)
           }
         ),
         names = variables
       )
     )
-  if(any(sapply(c(X,Y,Z), length) > 0)){
-    if(length(variables) > 1) stop("Values of X, Y, and Z can't be specified if more than one variable is requested or if 'includeCoords' is TRUE.")
-    elements = varLocs == "CELLCENTERED"
-    nodeIDs = HGSSlice(HGSFile, X, Y, Z, elements)
-    nodeIDs[TRUE] = requestedData[nodeIDs,]
-    requestedData = nodeIDs
+
+  if(includeCoords) {
+    # get the XYZ location of each node
+    XYZs = HGSGetData(HGSFile, c("X", "Y", "Z"), blockNumber = blockNumber)
+    # if they are cell centered, get the average XYZ for each cell
+    if (varLocs == "CELLCENTERED") {
+      XYZs =
+        apply(
+          HGSF$elementNodes,
+          1,
+          function(ids) {
+            apply(XYZs[ids,], 2, mean)
+          }
+        )
+      XYZs = structure(data.frame(t(XYZs)), names = c("X", "Y", "Z"))
+    # NODECENTERED and CELLCENTERED are the only expected locations; throw and
+    # error if another location is detected.
+    } else if(varLocs != "NODECENTERED") {
+      stop("Unexpected variable location: ", VarLocs, ".  Contact the package developer.")
+    }
+    # Bind XYZ data to requested data
+    requestedData = cbind(XYZs, requestedData)
+  }
+
+  # If slicing is requested...
+  if(any(sapply(list(X,Y,Z), length) > 0)){
+    # get the node IDs of the slice
+    nodeIDs = HGSSlice(HGSFile, X, Y, Z, cells = (varLocs == "CELLCENTERED") )
+    # if there is only one column requested, the dimensions of nodeIDs will be
+    # the dimensions of the return values
+    if(ncol(requestedData) == 1) {
+      dims = dim(nodeIDs)
+      dimNames = dimnames(nodeIDs)
+    # otherwise, we have to add nVariables as an additional dimension of the
+    # return values
+    } else {
+      # get the dimensions of nodeIDs
+      dims = dim(nodeIDs)
+      dimNames = dimnames(nodeIDs)
+      # if nodeIDs is 1D, then the length of nodeIDs is the first dimension
+      if(is.null(dim(nodeIDs))) {
+        dims = length(nodeIDs)
+        dimNames =
+          structure(
+            list(as.character(1:length(nodeIDs))),
+            names = c("X", "Y", "Z")[sapply(list(X,Y,Z), length) == 0]
+          )
+        # if we are dealing with the Z dimension, reverse it.
+#        if(names(dimNames) == "Z") {
+#          nodeIDs = rev(nodeIDs)
+#          dimNames[[1]] = rev(dimNames[[1]])
+#        }
+      }
+      # add the extra dimension to account for more than one variable
+      dims = c(dims, ncol(requestedData))
+      dimNames = c(dimNames, list(var = names(requestedData)))
+    }
+    requestedData =
+      structure(
+#        sapply(requestedData, function(x) x[nodeIDs]),
+        unlist(requestedData[nodeIDs,], use.names = F),
+        dim = dims,
+        dimnames = dimNames
+      )
+#    nodeIDs[TRUE] = requestedData[nodeIDs,]
+#    requestedData = nodeIDs
   }
 
   return(requestedData)
 }
 
-HGSSlice = function(HGSFile, X = integer(0), Y = integer(0), Z = integer(0), elements = F) {
+#' @export
+HGSSlice = function(HGSFile, X = integer(0), Y = integer(0), Z = integer(0), cells = F) {
 
-  # subroutine that calculates the nodes along an axis given values of (X,Y),
-  # (X,Z), or (Y,Z).  This is an internal function that can only be called from
-  # within HGSSlice() because it references values from the HGSSlice
-  # environment.
+  # axisNodes is a subroutine that calculates the nodes along an axis given
+  # values of (X,Y), (X,Z), or (Y,Z).  This is an internal function that can
+  # only be called from within HGSSlice() because it references values from the
+  # HGSSlice environment.
   axisNodes = function(dimValues) {
     if(!("Z" %in% names(dimValues))) {
       #for any axis in the Z dimension, the first node ID is (Y-1)*MaxX + X.
@@ -108,12 +192,12 @@ HGSSlice = function(HGSFile, X = integer(0), Y = integer(0), Z = integer(0), ele
     return(nodes)
   }
 
-  # to map elements (e.g. the "cubes" in between the nodes), the algorithm is
+  # to map cells (e.g. the "cubes" in between the nodes), the algorithm is
   # identical to mapping nodes, but the X, Y, and Z dimensions of the model are
   # decremented by 1.
-  if(elements) {
+  if(cells) {
     HGSFile$dims = HGSFile$dims - 1
-    if(any(HGSFile$dims <= 0)) stop("Model is 1D or 2D.  Therefore, 3D elements can't be mapped.")
+    if(any(HGSFile$dims <= 0)) stop("Model is 1D or 2D.  Therefore, 3D cells can't be mapped.")
   }
   # double check to be sure the names of the dims element are c("X", "Y", "Z")
   if(any(names(HGSFile$dims)!= c("X", "Y", "Z"))) stop("HGSAxis() can't work with this HGSFile Object because the names of the 'dims' element is not c('X', 'Y', 'Z').")
@@ -173,9 +257,8 @@ HGSSlice = function(HGSFile, X = integer(0), Y = integer(0), Z = integer(0), ele
     # assign some useful lables to the matrix
     dimnames(nodes) = structure(lapply(HGSFile$dims[varyingDims], function(x) seq(1,x)), names = varyingDims)
     # invert the rows (to orient Z or Y dimension)
-    nodes = nodes[nrow(nodes):1,]
+ #   nodes = nodes[nrow(nodes):1,]
   }
 
   return(nodes)
 }
-

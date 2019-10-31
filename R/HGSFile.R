@@ -142,12 +142,15 @@ HGSFileBody.pm = function(x, taggedLines) {
   taggedLines$nlines = c(taggedLines$line[2:nrow(taggedLines)], fileEnd) - taggedLines$line - 1
   #grab the data necessary to lookup the node ids for each element.  This gets
   #the "line" and "nlines" values for the "nodes" record in taggedLines,
-  #converts them to a list, and renames the values according the the names in mapColumns.
+  #converts them to a vector, and renames the values according the the names in mapColumns.
   elementNodes =
     structure(
       as.integer(taggedLines[subset$nodes,mapColumns[1:2]]),
       names = names(mapColumns[1:2])
     )
+  #now use the info in elementNodes to read the element nodes from the file.
+  elementNodes = scan(file = x, skip = elementNodes["skip"], nlines = elementNodes["nlines"], quiet = T)
+  elementNodes = matrix(elementNodes, ncol = 8, byrow = T)
 
   #create a defaultDataMap from the first block of lines in subset$data.  Again,
   #the first lenght(vars) lines in subset$data contain a complete data set.
@@ -218,13 +221,13 @@ HGSFileBody.pm = function(x, taggedLines) {
   # the number of elements in the z dimensions is nElements/((xDim-1)*(yDim-1)).
   # Finally, the number of nodes in the zDim is 1 more than the number of
   # elements in the zDim.  WHEW!!!
-  FirstElementNodes = scan(file = x, skip = elementNodes[1], n=8, quiet = T)
+  FirstElementNodes = elementNodes[1,]
   xDim = FirstElementNodes[4] - 1
   yDim = (FirstElementNodes[5] - 1)/xDim
-  zDim = unname(elementNodes[2]/((xDim-1)*(yDim-1)) + 1)
+  zDim = unname(nrow(elementNodes)/((xDim-1)*(yDim-1)) + 1)
 
   #return a list to be appended to the default file description (including fileinfo, description, and tagged lines)
-  list(variables = vars, elementNodeLookup = elementNodes, dims = c(X = xDim, Y=yDim, Z = zDim), blocks = blocks)
+  list(variables = vars, elementNodes = elementNodes, dims = c(X = xDim, Y=yDim, Z = zDim), blocks = blocks)
 }
 
 getTaggedLines = function(filepath = file.choose(), tags) {

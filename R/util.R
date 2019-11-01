@@ -54,7 +54,7 @@ getTags = function(fileType, tagNames = NULL) {
 #' HGSQueryBlocks(HGSF, "SOLUTIONTIME")
 #'
 #' # returns the simulation times for each simulation block followed by the variable locations for each simulation block
-#' HGSQueryBlocks(HGSF, c("SOLUTIONTIME", "VARLOCATION")
+#' HGSQueryBlocks(HGSF, c("SOLUTIONTIME", "VARLOCATION"))
 #'
 #' @export
 HGSQueryBlocks = function(HGSFile, descriptors = NULL) {

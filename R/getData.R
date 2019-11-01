@@ -1,66 +1,64 @@
-#' Get data values from HGS files
-#'
-#' Returns the data values associated with node nodes or cells in an HGS model.
-#'
-#' @param HGSFile An S3 object of class "HGSFile" created by calling
-#'   \code{\link{HGSFile}}.
-#'
-#' @param variables A character vector containing valid variable names.
-#'   Valid variable names are stored in the HGSFile object and can be displayed
-#'   with <HGSFile>$variables, where <HGSFile> is the name of the HGSFile
-#'   object.
-#'
-#' @param blockNumber,solutionTime Specify one, but only one, of these two
-#'   variables to choose the time step from which data should be retrieved. Use
-#'   blockNumber to specify an index of the times steps that were output (e.g.,
-#'   to get data from the first time step that was output, specify '1', for the
-#'   second '2', etc.). Use solutionTime to specify the solution time from which
-#'   to retrieve data. (Note: Available solutionTimes are stored in the HGSFile
-#'   object and can be accessed using the \code{\link{HGSQueryBlocks}} function
-#'   with "SOLUTIONTIME" as a descriptor).
-#'
-#' @param X,Y,Z The index (i.e., '1' for first node or cell, '2' for second,
-#'   etc., not the spatial coordinates) of the node or cell to be returned in each
-#'   dimension. Setting one or two of these parameters invokes "slicing" of
-#'   model output, returning either a vector representing an axis or a matrix representing
-#'   a slice through the model. See "Value" section, below, for behavior
-#'   depending on how many parameters are set.
-#'
-#' @param includeCoords Set to T to include the X, Y, Z coordinates associated
-#'   with the selected variable.
-#'
-#' @return Either a data.frame, a vector, or a matrix, depending on the values
-#'   for X, Y, and Z.  Importantly, the values of X, Y, and Z are index values
-#'   for nodes.  For instance, Z=1 would specify the bottom-most layer of nodes
-#'   (for node-centered data) or cells (for cell-centered data) in the model,
-#'   regardless of the actual spatial coordinates of the nodes/cells.
-#'
-#'   if X, Y, and Z are all omitted (or specified as integer(0)), the return
-#'   value is a data.frame of all values associated with nodes (for
-#'   node-centered data) or cells (for cell centered data).  Setting
-#'   "includeCoords" will include in the data.frame the spatial coordinates of
-#'   each value.
-#'
-#'   If only one value for X, Y, or Z is specified, a matrix is returned, which
-#'   represents a 2D slice (plane) through the model at the specified node or
-#'   cell index.  If two of the three values X, Y, and Z are specified, the
-#'   result is a vector representing a 1D axis through the model at the
-#'   specified node (or cell) indicies.  Only one model variable can be
-#'   requested in a slice or axis.  If more than one variable is requested, or
-#'   if includeCoords is TRUE when X, Y, or Z is specified, an error results.
-#'
-#'   HGSGetData will return a data.frame when no values are passed for X, Y, and
-#'   Z (or X, Y, and Z are all equal to integer(0)).  The data.frame columns
-#'   will contain the values for the variables requested, along with the x, y,
-#'   and z coordinates (in spatial units used to run HGS) if includeCoords is
-#'   TRUE.
-#'
-#' @export
-#'
-#'
+# Get data values from HGS files
+#
+# Returns the data values associated with a particular output time for node
+# nodes or cells in an HGS model.
+#
+# @param HGSFile An S3 object of class "HGSFile" created by calling
+#   \code{\link{HGSFile}}.
+#
+# @param variables A character vector containing valid variable names. Valid
+#   variable names are stored in the HGSFile object and can be displayed with
+#   <HGSFile>$variables, where <HGSFile> is the name of the HGSFile object.
+#
+# @param blockNumber,solutionTime Specify one, but only one, of these two
+#   variables to choose the time step from which data should be retrieved. Use
+#   blockNumber to specify an index of the times steps that were output (e.g.,
+#   to get data from the first time step that was output, specify '1', for the
+#   second '2', etc.). Use solutionTime to specify the solution time from which
+#   to retrieve data. (Note: Available solutionTimes are stored in the HGSFile
+#   object and can be accessed using the \code{\link{HGSQueryBlocks}} function
+#   with "SOLUTIONTIME" as a descriptor).
+#
+# @param X,Y,Z The index (i.e., '1' for first node or cell, '2' for second,
+#   etc., not the spatial coordinates) of the node or cell to be returned in
+#   each dimension. Setting one or two of these parameters invokes "slicing" of
+#   model output, returning either a vector representing an axis or a matrix
+#   representing a slice through the model. See "Value" section, below, for
+#   behavior depending on how many parameters are set.
+#
+# @param includeCoords Set to T to include the X, Y, Z coordinates associated
+#   with the selected variable.
+#
+# @return Either a data.frame, a vector, or a matrix, depending on the values
+#   for X, Y, and Z.  Importantly, the values of X, Y, and Z are index values
+#   for nodes.  For instance, Z=1 would specify the bottom-most layer of nodes
+#   (for node-centered data) or cells (for cell-centered data) in the model,
+#   regardless of the actual spatial coordinates of the nodes/cells.
+#
+#   if X, Y, and Z are all omitted (or specified as integer(0)), the return
+#   value is a data.frame of all values associated with nodes (for node-centered
+#   data) or cells (for cell centered data).  Setting "includeCoords" will
+#   include in the data.frame the spatial coordinates of each value.
+#
+#   If only one value for X, Y, or Z is specified, a matrix is returned, which
+#   represents a 2D slice (plane) through the model at the specified node or
+#   cell index.  If two of the three values X, Y, and Z are specified, the
+#   result is a vector representing a 1D axis through the model at the specified
+#   node (or cell) indicies.  Only one model variable can be requested in a
+#   slice or axis.  If more than one variable is requested, or if includeCoords
+#   is TRUE when X, Y, or Z is specified, an error results.
+#
+#   HGSGetData will return a data.frame when no values are passed for X, Y, and
+#   Z (or X, Y, and Z are all equal to integer(0)).  The data.frame columns will
+#   contain the values for the variables requested, along with the x, y, and z
+#   coordinates (in spatial units used to run HGS) if includeCoords is TRUE.
+#
+# @export
+#
+#
 # ARGH! Axis with multiple variables crashes!!!
 #
-HGSGetData = function(HGSFile, variables, blockNumber = NULL, solutionTime = NULL, X = integer(0), Y = integer(0), Z = integer(0), includeCoords = F) {
+HGSGetDataOld = function(HGSFile, variables, blockNumber = NULL, solutionTime = NULL, X = integer(0), Y = integer(0), Z = integer(0), includeCoords = F) {
   # few checks of parameters
   if(is.null(solutionTime) && is.null(blockNumber)) stop("You must specify either the solution time or the block number associated with the data retrieval.")
   if(is.null(blockNumber)) {
@@ -165,7 +163,7 @@ HGSGetData = function(HGSFile, variables, blockNumber = NULL, solutionTime = NUL
   return(requestedData)
 }
 
-#' @export
+# @export
 HGSSlice = function(HGSFile, X = integer(0), Y = integer(0), Z = integer(0), cells = F) {
 
   # axisNodes is a subroutine that calculates the nodes along an axis given

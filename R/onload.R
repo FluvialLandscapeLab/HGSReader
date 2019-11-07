@@ -10,7 +10,9 @@
     # the following attributes will be added to and HGS.data.frame object.  The
     # names of each element are the attribute names.  The values will be parsed
     # and evaluated in the enviroment of the HGSData function.
-    HGSDataAttributes = c(varLoc = "varLocs", dims = "HGSFile$dims") #, vars = "names(x)")
+    HGSDataAttributes = c(varLoc = "varLocs", dims = "HGSFile$dims"), #, vars = "names(x)"),
+    HGSVariableLocations = c(nodeCentered = "NODECENTERED", cellCentered = "CELLCENTERED"),
+    HGSCubeDimLabels = c(x = "X", y = "Y", z = "Z", time = "Time", var = "Var")
   )
   options(op.HGSReader)
   invisible()

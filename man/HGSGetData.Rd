@@ -2,13 +2,10 @@
 % Please edit documentation in R/dataCube.R
 \name{HGSGetData}
 \alias{HGSGetData}
-\alias{HGSCube}
 \title{Get data values from HGS files}
 \usage{
-HGSGetData(HGSFile, variables, blockNumber = NULL, solutionTime = NULL,
-  includeCoords = F)
-
-HGSCube(HGSdf)
+HGSGetData(HGSFile, variables, blockNumbers = NULL,
+  solutionTimes = NULL, includeCoords = F, asArray = T)
 }
 \arguments{
 \item{HGSFile}{An S3 object of class "HGSFile" created by calling
@@ -18,48 +15,51 @@ HGSCube(HGSdf)
 variable names are stored in the HGSFile object and can be displayed with
 <HGSFile>$variables, where <HGSFile> is the name of the HGSFile object.}
 
-\item{blockNumber, solutionTime}{Specify one, but only one, of these two
+\item{blockNumbers, solutionTimess}{Specify one, but only one, of these two
 variables to choose the time step from which data should be retrieved. Use
 blockNumber to specify an index of the times steps that were output (e.g.,
 to get data from the first time step that was output, specify '1', for the
-second '2', etc.). Use solutionTime to specify the solution time from which
-to retrieve data. (Note: Available solutionTimes are stored in the HGSFile
-object and can be accessed using the \code{\link{HGSQueryBlocks}} function
-with "SOLUTIONTIME" as a descriptor).}
+second '2', etc.). Use solutionTimes to specify the solution time from
+which to retrieve data. (Note: Available solutionTimess are stored in the
+HGSFile object and can be accessed using the \code{\link{HGSQueryBlocks}}
+function with "solutionTimes" as a descriptor).}
 
-\item{includeCoords}{Set to TRUE to include the X, Y, Z coordinates associated
-with the selected variable.  As an alternative, X, Y, and/or Z can be
-included the \code{variables} vector with other NODE centered variable
-names; when \code{variables} containes names of CELLCENTERED variables, set
-\code{includeCoords = T} to return the coordinates of cell centroids.}
+\item{includeCoords}{Set to TRUE to return X, Y, Z coordinates (in HGS model
+units) in addition to specified variables.}
 
-\item{HGSdf}{S3 object of class "HGS.data.frame" created by calling
-\code{\link{HGSGetData}}.}
+\item{asArray}{When TRUE, returns an "HGSArray" object.  When FALSE, returns
+an "HGS.data.frame" object.  See "Value," below.}
 }
 \value{
-\code{HGSGetData} returns an HGS.data.frame object of values
+\code{HGSGetData} When asArray is TRUE, returns an "HGSArray" S3
+  object, which is 5-dimensional \code{array} where the first three
+  dimensions are the node indices in the X, Y, and Z dimensions, the 4th
+  dimension is simulation time, and the 5th dimension consists of the
+  requested variables. "NodeID" or "CellID" is a variable name added to the
+  array automatically.  As with any \code{array} in R, the HGSArray can be
+  sectioned using square brackets "[]".
+
+  Note that "drop = F" can be a useful parameter within the square brackets
+  to prevent loss of an array dimension when a single value of one dimension
+  is specified.  See the help for square bracket by clicking this link:
+  \code{\link{[}}
+
+  An HGSCube object always includes all 5 dimensions.  HGSCube inherits from
+  HGSArray.  As soon as an HGSCube is sectioned with square brackets
+  (therefore, potentially losing at least one dimension), it becomes simply
+  an HGSArray object.  When sectioning with square brackets results in
+  a 1-D vector, the HGSArray class designation is lost.
+
+  When asArray is FALSE, returns an HGS.data.frame object of values
   associated with nodes (for NODECENTERED variables) or cells (for
-  CELLCENTERED variables). There is one column for each variable requested,
-  along with columns for the X, Y, and Z coordinates (in the spatial units
-  determined when setting up the HGS model run) if includeCoords is TRUE.
+  CELLCENTERED variables). There is one column for solution time,
+  CellID/NodeID, and each variable requested, along with columns for the X,
+  Y, and Z coordinates (in the spatial units determined when setting up the
+  HGS model run) if includeCoords is TRUE.
 
   Use \code{attr(<HGS.data.frame_Object>, "varLoc")} to determine if
   variables in the HGS.data.frame are NODECENTERED and which are
   CELLCENTERED.
-
-  \code{HGSCube} returns an "HGSCube" S3 object, which is 4-dimensional
-  \code{array} where the first three dimensions are the node indices in the
-  X, Y, and Z dimensions and the 4th dimension is the variable name. "NodeID"
-  or "CellID" is a variable name added to the array automatically.  As with
-  any \code{array} in R, the HGSCube can be sectioned using square brackets
-  "[]". Note that "drop = F" can be a useful parameter after the dimensions
-  specified within the square brackets to prevent collapsing with a single
-  value of one dimension is specified.  See the help for square bracket by
-  clicking this link: \code{\link{[}}
-
-  The HGSCube object represents all output for a single model timestep.
-  HGSCube inherits from HGSArray.  When HGSCube is sectioned with square
-  brackets, it becomes simply an HGSArray object.
 }
 \description{
 Get and manipulate output values associated with nodes or cells in an HGS

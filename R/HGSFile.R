@@ -196,6 +196,8 @@ HGSFileBody.pm = function(x, taggedLines) {
     SIMPLIFY = F
   )
 
+  names(blocks) = as.character(sapply(blocks, `[[`, "SOLUTIONTIME"))
+
   # The following code determines the dimensions of the HGS space, assuming it's
   # rectangular.  In the rectangular mesh, all nodes are given a serial ID
   # starting at 1.  In plan view (x = left-right, y = up-down), ID=1 is in the
@@ -242,14 +244,12 @@ getTaggedLines = function(filepath = file.choose(), tags) {
   #create a read only file connection
   con = file(filepath, "r")
 
+  nToRead = 10000
   #read the file one line at a time
   while ( TRUE ) {
-    line = readLines(con, n = 1)
+    line = readLines(con, n = nToRead)
     #stop at end of file
-    if (length(line) == 0 ) {
-      break
-    }
-    counter = counter + 1
+    if (length(line) == 0 ) break
     # for debug
     #    x<<-counter
     #    lineText<<-line
@@ -258,21 +258,28 @@ getTaggedLines = function(filepath = file.choose(), tags) {
     isTagged = sapply(paste0("^", tags), grepl, x = line)
     # if so, update the vectors of the data.frame
     if(any(isTagged)) {
-      #if more than one tag matches, take the first one.
-      tagIdx = which(isTagged)[1]
+      # which lines are tagged
+      taggedIdx = which(apply(isTagged, 1, any))
+      # get the tagged lines
+      taggedLines = line[taggedIdx]
+      # get the column with the tag; if more than one, take the first.
+      tagCol = apply(isTagged[taggedIdx,,drop=F], 1, function(x) which(x)[1])
       #remove quotes from the line
-      line = gsub("\"", "", line)
+      taggedLines = gsub("\"", "", taggedLines)
       #trim white space
-      line = trimws(line)
+      taggedLines = trimws(taggedLines)
       #get the portion of the tag in front of the first space in the tag
-      tagToRemove = regmatches(tags[tagIdx], regexpr(" ", tags[tagIdx]), invert = T)[[1]][1]
+      toRemove = sapply(tagCol, function(tagIdx) regmatches(tags[tagIdx], regexpr(" ", tags[tagIdx]), invert = T)[[1]][1])
       #trim off the tagToRemove plus any following spaces or equal signs
-      line = gsub(paste0("^", tagToRemove, "[ =]*"), "", line)
+      taggedLines = mapply(function(l, rmv) gsub(paste0("^", rmv, "[ =]*"), "", l), taggedLines, toRemove, USE.NAMES = F)
       #store the line, line number, and tag name
-      lines = c(lines, line)
-      lineNums = c(lineNums, counter)
-      lineTags = c(lineTags, names(tags)[tagIdx])
+      lines = c(lines, taggedLines)
+      lineNums = c(lineNums, taggedIdx + counter)
+      lineTags = c(lineTags, names(tags)[tagCol])
     }
+    counter = counter + length(line)
+    if((counter %% (nToRead*10)) == 0) cat(paste(format(counter, scientific = F), "lines processed...\n"))
+#    if (length(line) < ) break
   }
   close(con)
 

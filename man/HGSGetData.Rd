@@ -15,7 +15,7 @@ HGSGetData(HGSFile, variables, blockNumbers = NULL,
 variable names are stored in the HGSFile object and can be displayed with
 <HGSFile>$variables, where <HGSFile> is the name of the HGSFile object.}
 
-\item{blockNumbers, solutionTimess}{Specify one, but only one, of these two
+\item{blockNumbers, solutionTimes}{Specify one, but only one, of these two
 variables to choose the time step from which data should be retrieved. Use
 blockNumber to specify an index of the times steps that were output (e.g.,
 to get data from the first time step that was output, specify '1', for the

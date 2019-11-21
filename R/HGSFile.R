@@ -45,7 +45,7 @@
 #'   with \code{\link{scan}}.  (HGS elements are, e.g., the cubes demarcated by
 #'   eight nodes in the simulation space.)}
 #'
-#'   \item{\code{dims} A named numeric vector telling the number of nodes in the
+#'   \item{\code{modelDim} A named numeric vector telling the number of nodes in the
 #'   simulation space in X, Y, and Z dimensions.}
 #'
 #'   \item{\code{blocks} A list containing sublists describing information about
@@ -229,7 +229,7 @@ HGSFileBody.pm = function(x, taggedLines) {
   zDim = unname(nrow(elementNodes)/((xDim-1)*(yDim-1)) + 1)
 
   #return a list to be appended to the default file description (including fileinfo, description, and tagged lines)
-  list(variables = vars, elementNodes = elementNodes, dims = c(X = xDim, Y=yDim, Z = zDim), blocks = blocks)
+  list(variables = vars, elementNodes = elementNodes, modelDim = c(X = xDim, Y=yDim, Z = zDim), blocks = blocks)
 }
 
 getTaggedLines = function(filepath = file.choose(), tags) {

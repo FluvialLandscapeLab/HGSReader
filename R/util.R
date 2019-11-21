@@ -4,7 +4,7 @@ print.HGSFile = function(x) {
   cat("  Source file: ", x$fileInfo$path, "\n")
   cat("  Last modified: ", paste(x$fileInfo$mtime) , "\n", sep = "")
   cat("  Variables: '", paste(x$variables, collapse = "', '"), "'\n", sep = "")
-  cat("  Model dimensions: ", paste0(names(x$dims), " = ", x$dims, collapse = ", "), " nodes", sep = "")
+  cat("  Model dimensions: ", paste0(names(x$modelDims), " = ", x$modelDims, collapse = ", "), " nodes", sep = "")
 }
 
 # gets the value that tag key rows in an HGS output file.  These tags are defined in .onload().

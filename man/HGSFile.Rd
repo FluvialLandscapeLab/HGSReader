@@ -49,7 +49,7 @@ Returns an S3 object with a class of "HGSFile".  The object will also
   with \code{\link{scan}}.  (HGS elements are, e.g., the cubes demarcated by
   eight nodes in the simulation space.)}
 
-  \item{\code{dims} A named numeric vector telling the number of nodes in the
+  \item{\code{modelDim} A named numeric vector telling the number of nodes in the
   simulation space in X, Y, and Z dimensions.}
 
   \item{\code{blocks} A list containing sublists describing information about

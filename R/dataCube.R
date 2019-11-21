@@ -10,7 +10,7 @@
 #'   variable names are stored in the HGSFile object and can be displayed with
 #'   <HGSFile>$variables, where <HGSFile> is the name of the HGSFile object.
 #'
-#' @param blockNumbers,solutionTimess Specify one, but only one, of these two
+#' @param blockNumbers,solutionTimes Specify one, but only one, of these two
 #'   variables to choose the time step from which data should be retrieved. Use
 #'   blockNumber to specify an index of the times steps that were output (e.g.,
 #'   to get data from the first time step that was output, specify '1', for the
@@ -156,9 +156,9 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
 
   if (!asArray){
       if(cellCentered) {
-        requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), CellID = 1:prod(HGSFile$dims-1), df), requestedData, solutionTimes)
+        requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), CellID = 1:prod(HGSFile$modelDim-1), df), requestedData, solutionTimes)
       } else {
-        requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), NodeID = 1:prod(HGSFile$dims), df), requestedData, solutionTimes)
+        requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), NodeID = 1:prod(HGSFile$modelDim), df), requestedData, solutionTimes)
       }
     #}
     requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
@@ -167,20 +167,20 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
     requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
 
     # subtract 1 from all model dimensions if CELLCENTERED data
-    dims = HGSFile$dims - ifelse(cellCentered, 1, 0)
+    modelDim = HGSFile$modelDim - ifelse(cellCentered, 1, 0)
     # add dimensions for variable names and time
-    dims = c(dims, length(solutionTimes), length(variables)+1)
-    names(dims) = getOption("HGSCubeDimLabels")[c("x", "y", "z", "time", "var")]
+    modelDim = c(modelDim, length(solutionTimes), length(variables)+1)
+    names(modelDim) = getOption("HGSCubeDimLabels")[c("x", "y", "z", "time", "var")]
     # add names for the variables, including "NodeID" or "CellID"
     dimNames =
       list(
-        1:dims[getOption("HGSCubeDimLabels")["x"]],
-        1:dims[getOption("HGSCubeDimLabels")["y"]],
-        1:dims[getOption("HGSCubeDimLabels")["z"]],
+        1:modelDim[getOption("HGSCubeDimLabels")["x"]],
+        1:modelDim[getOption("HGSCubeDimLabels")["y"]],
+        1:modelDim[getOption("HGSCubeDimLabels")["z"]],
         solutionTimes,
         c(unname(ifelse(cellCentered, "CellID", "NodeID")), variables)
       )
-    names(dimNames) = names(dims)
+    names(dimNames) = names(modelDim)
     # convert data.frame to array with dimensions X, Y, Z, vars.
     requestedData =
       array(
@@ -188,10 +188,10 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
           #the "rep" makes a repeating list of CellIDs or NodeIDs.  Each X, Y,
           #and Z has a unique ID; the list is repped for each variable and time
           #so the array is filled properly.
-          rep(1:prod(dims[1:3]), dims[4]),
+          rep(1:prod(modelDim[1:3]), modelDim[4]),
           unlist(requestedData, use.names = F)
         ),
-        dim = dims,
+        dim = modelDim,
         dimnames = dimNames
       )
     class(requestedData) = c("HGSCube", "HGSArray")
@@ -268,49 +268,33 @@ as.data.frame.HGSArray = function(x) {
 
 
 #' @export
-`[.HGSCube` = function(x, ...) {
+`[.HGSCube` = function(x, ..., drop = T) {
   class(x) = class(x)[class(x) != "HGSCube"]
   NextMethod()
 }
 
 #' @export
-`[.HGSArray` = function(x, ...) {
-  # store the attributes of x
-  xAttr = attributes(x)
-  # perform the `[` fuction.
-  x = NextMethod()
-  if(is.null(dim(x))) return(x)
 
-  class(x) = xAttr$class
-  attributes(x) = c(attributes(x), xAttr[names(getOption("HGSDataAttributes"))])
+`[.HGSArray` = function(x, ..., drop = T) {
 
-  # if the new array doesn't have a "Var" dimension...
-  for(idx in getOption("HGSCubeDimLabels")[c("time", "var")]) {
-    if(!(idx %in% names(dimnames(x)))) {
-      # Check to see if "<idx>" dimension has been lost.  If so, there
-      # must have been a single variable specified by the user in the call to `[`.
-      # To keep track of that variable, we want to store that variable as a "<idx>" attribute.
-      if(idx %in% names(xAttr$dimnames)) {
-        # So determine which dimension is the "<idx>" dimension of the HGSArray.
-        theDim = which(names(xAttr$dimnames) == idx)
-        # A dimension can be lost if it had only one level, in which case the
-        # spec is the dimname
-        if(xAttr$dim[theDim] == 1) {
-          theSpec = xAttr$dimnames[[theDim]]
-        } else {
-        # otherwise, the parameter passed in specified only one level so get the
-        # parameter that specified the variable to keep...
-          theSpec = eval(as.list(match.call())[[theDim + 2]])
-        }
-        # if that specification is numeric, convert it to a variable name...
-        if(mode(theSpec) == "numeric") theSpec = xAttr$dimnames[[idx]][theSpec]
-        # and store the variable name in the attributes.
-        attr(x, idx) = theSpec
-      } else {
-        # if there was no "<idx>" dimension in the original array, there must be a
-        # <idx> attribute, so copy it.
-        attr(x, idx) = xAttr[[ idx ]]
-      }
+  if(!drop) {
+    x = NextMethod()
+  } else {
+    # store the attributes of x
+    xAttr = attributes(x)
+
+    # Find demensions that will be dropped, which are those where the dimension length is 1 when drop = F.
+#    newAttr = attributes(unclass(x)[..., drop = F])
+    newAttr = attributes(NextMethod(drop = F))
+    lostDimNames = newAttr$dimnames[newAttr$dim == 1]
+#    lostDimNames = sapply(lostDimNames, function(x) ifelse(is.na(as.numeric(x)), x, as.numeric(x)), simplify = F)
+
+    # perform the `[` fuction.
+#    x = x[..., drop = T]
+    x = NextMethod()
+
+    if(!is.null(dim(x))){
+      attributes(x) = c(attributes(x), xAttr[!(names(xAttr) %in% names(attributes(x)))], lostDimNames)
     }
   }
   x

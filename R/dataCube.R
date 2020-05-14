@@ -90,6 +90,8 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
     stop("The following variables were requested but not found at the following solution time: \n",
          paste0("    '", badVarNames, "' is missing at solution time(s): ", sapply(badSolutionTimes, paste0, collapse = ', ')))
   }
+
+  # check to make sure all variables are either NODECENTERED or BLOCKCENTERED
   varDm = dmList[[1]][variables,]
   varLocs = unique(varDm$varLocation)
   if(length(varLocs) > 1) {
@@ -98,12 +100,88 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
 
   if (!(varLocs %in% getOption("HGSVariableLocations"))) stop("Unexpected variable location: ", VarLocs, ".  If this error is repeatable, contact the package developer.")
 
-
-  if(includeCoords) variables = variables[!(variables %in% c("X", "Y", "Z"))]
+  # Add X, Y, Z to variable lists if includeCoords =  T and remove duplicates
+  if(includeCoords) variables = c(variables, getOption("HGSCoordVars"))
   variables = unique(variables)
 
+  # from the check, above, we know that all variables have the same location.
+  # Set T if cellCentered, F if NodeCentered.
   cellCentered = (varLocs == getOption("HGSVariableLocations")["cellCentered"])
 
+  # Many of the Blocks have data from the same location in the file.  For
+  # instance, X, Y, Z data are only in the file once.  Rather than read
+  # the same data over and over, create "readLocs" which is a unique list of
+  # locations in the file that have requested data.
+
+  # start by rbinding all of the block descriptions into a single data.frame.
+  # Also adds row names of each block as a column called "variable."
+  readLocs = do.call(rbind, c(lapply(dmList, function(x) data.frame(x, variable = row.names(x), stringsAsFactors = F)), list(make.row.names = F)))
+  # order by "skip", which represent a unique location within the file for each
+  # section of data.
+  readLocs = readLocs[order(readLocs$skip),]
+  # get rid of duplicates using run length encoding
+  readLocsIdx = c(1, cumsum(rle(readLocs$skip)$length)+1)
+  readLocs = readLocs[readLocsIdx[-length(readLocsIdx)],]
+  # calculate the number of lines to skip and read, relative to the prior
+  # section of data rather than relative to the beginning of the file.
+  linesRead = readLocs$skip + readLocs$nlines
+  readLocs$skipBetween = readLocs$skip - c(0, linesRead[-length(linesRead)])
+
+  # now there's no point in reading data that's not requested, so consolidate
+  # row counts for unrequested variables into the skipBetween values of the
+  # requested variables.  Start by determining which lines in readLocs have
+  # requested variables.
+  readLocs$requested = readLocs$variable %in% variables
+  # lable runs of requested and non-requested variables as groups
+  groupLengths = rle(readLocs$requested)$lengths
+  readLocs$requestGroup = rep(1:length(groupLengths), times = groupLengths)
+  # for all of the non requested variables, sum of the total lines to skip for each group.
+  groupSkipBetween = sapply(1:length(groupLengths), function(i) sum(readLocs[readLocs$requestGroup == i, c("nlines", "skipBetween")]))
+  # retain only the requested variables...
+  readLocs = readLocs[readLocs$requested,]
+  # and add the lines to skip to the first requested variable in each group.
+  for(i in unique(readLocs$requestGroup[readLocs$requestGroup > 1])) {
+    readLocs$skipBetween[which(readLocs$requestGroup == i)[1]] = readLocs$skipBetween[which(readLocs$requestGroup == i)[1]] + groupSkipBetween[i-1]
+  }
+  # make an empty list to hold each sections of data.
+  dataBlocks = vector(mode = "list", nrow(readLocs))
+
+  # now scan the file once from top to bottom using the relative skip and read
+  # lengths
+  inFile = file(HGSFile$fileInfo$path, open = "r")
+  for(i in 1:nrow(readLocs)) {
+    dataBlocks[[i]] = scan(inFile, skip = readLocs$skipBetween[i], nlines = readLocs$nlines[i], quiet = T)
+    print(paste("Reading data location", i, "of", nrow(readLocs)))
+  }
+  close(inFile)
+
+  # if the variables are cellCentered, calculate the XYZ values for cell centers.
+  if (cellCentered & includeCoords) {
+    print("Calculating node center locations...")
+    XYZidx = readLocs$variable %in% getOption("HGSCoordVars")
+    dataBlocks[XYZidx] =
+      lapply(
+        dataBlocks[XYZidx],
+        function(vals) {
+          # tElementNodes = t(HGSF$elementNodes)
+          # means =
+          #   mapply(
+          #     function(b,e) mean(vals[tElementNodes[b:e]]),
+          #     b = seq(1, length(tElementNodes), 8),
+          #     e = seq(8, length(tElementNodes), 8)
+          #   )
+          .rowMeans(vals[HGSF$elementNodes], nrow(HGSF$elementNodes), ncol(HGSF$elementNodes))
+          #structure(data.frame(t(means)), names = c("X", "Y", "Z"))
+        }
+      )
+  }
+
+  # name the datablocks with values of "readLocs$skip" -- the number of lines
+  # from the beginning of the file.
+  names(dataBlocks) = as.character(readLocs$skip)
+
+  print("Melding data into requested blocks...")
+  # cbind the sections into the data associated with each requested block
   requestedData =
     lapply(
       dmList,
@@ -114,8 +192,9 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
               variables,
               function(v) {
                 skip = dm[v, "skip"]
-                nlines = dm[v, "nlines"]
-                scan(file = HGSFile$fileInfo$path, skip = skip, nlines = nlines, quiet = T)
+#                nlines = dm[v, "nlines"]
+#                scan(file = HGSFile$fileInfo$path, skip = skip, nlines = nlines, quiet = T)
+                dataBlocks[[as.character(skip)]]
               }
             ),
             names = variables
@@ -124,37 +203,8 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
       }
     )
 
-  if(includeCoords) {
-    # get the XYZ location of each node
-
-        # note: [,c("X", "Y", "Z")] at end of next statement is needed because
-        # "NodeID" and "Time" come back as columns in the data.frame
-    XYZs = HGSGetData(HGSFile, c("X", "Y", "Z"), blockNumbers = 1, asArray = F)[,c("X", "Y", "Z")]
-
-    # if they are cell centered, get the average XYZ for each cell
-    if (cellCentered) {
-      XYZs =
-        lapply(
-          XYZs,
-          function(vals) {
-            # tElementNodes = t(HGSF$elementNodes)
-            # means =
-            #   mapply(
-            #     function(b,e) mean(vals[tElementNodes[b:e]]),
-            #     b = seq(1, length(tElementNodes), 8),
-            #     e = seq(8, length(tElementNodes), 8)
-            #   )
-            means = apply(HGSF$elementNodes, 1, function(ids) mean(vals[ids]))
-            #structure(data.frame(t(means)), names = c("X", "Y", "Z"))
-          }
-        )
-    }
-    # Bind XYZ data to requested data
-    requestedData = lapply(requestedData, function(x) cbind(as.data.frame(XYZs), x))
-    variables = c(c("X", "Y", "Z"), variables)
-  }
-
   if (!asArray){
+      print("Assembling data.frame...")
       if(cellCentered) {
         requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), CellID = 1:prod(HGSFile$modelDim-1), df), requestedData, solutionTimes)
       } else {
@@ -164,6 +214,7 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
     requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
     class(requestedData) = c("HGS.data.frame", "data.frame")
   } else {
+    print("Assembling data cube...")
     requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
 
     # subtract 1 from all model dimensions if CELLCENTERED data
@@ -274,7 +325,6 @@ as.data.frame.HGSArray = function(x) {
 }
 
 #' @export
-
 `[.HGSArray` = function(x, ..., drop = T) {
 
   if(!drop) {
@@ -330,4 +380,22 @@ print.HGSArray = function(x, ...) {
   x = aperm(x, perm)
   # apply the indices to reverse the Z dimension of the array.
   print(do.call(`[`, c(list(x), indices[perm], list(drop = F))))
+}
+
+
+skipAhead = function(con, n, chunk = 10000) {
+  success = T
+  for(chunkN in c(rep(chunk, floor(n/chunk)), n%%chunk)) {
+    if(chunkN>0) {
+      nRead = length(readLines(con, n = chunkN))
+    } else {
+      nRead = 0
+    }
+
+    if(nRead < chunkN) {
+      success = F
+      break
+    }
+  }
+  return(success)
 }

@@ -12,6 +12,7 @@
     # and evaluated in the enviroment of the HGSData function.
     HGSDataAttributes = c(varLoc = "varLocs", modelDim = "HGSFile$modelDim"), #, vars = "names(x)"),
     HGSVariableLocations = c(nodeCentered = "NODECENTERED", cellCentered = "CELLCENTERED"),
+    HGSCoordVars = c("X", "Y", "Z"),
     HGSCubeDimLabels = c(x = "X", y = "Y", z = "Z", time = "Time", var = "Var")
   )
   options(op.HGSReader)

@@ -249,7 +249,8 @@ getTaggedLines = function(filepath = file.choose(), tags) {
   while ( TRUE ) {
     line = readLines(con, n = nToRead)
     #stop at end of file
-    if (length(line) == 0 ) break
+    nLines = length(line)
+    if (nLines == 0) break
     # for debug
     #    x<<-counter
     #    lineText<<-line
@@ -259,7 +260,7 @@ getTaggedLines = function(filepath = file.choose(), tags) {
     # if so, update the vectors of the data.frame
     if(any(isTagged)) {
       # which lines are tagged
-      taggedIdx = which(apply(isTagged, 1, any))
+      taggedIdx = sort(unique(which(isTagged)%%nLines))
       # get the tagged lines
       taggedLines = line[taggedIdx]
       # get the column with the tag; if more than one, take the first.
@@ -278,7 +279,7 @@ getTaggedLines = function(filepath = file.choose(), tags) {
       lineTags = c(lineTags, names(tags)[tagCol])
     }
     counter = counter + length(line)
-    if((counter %% (nToRead*10)) == 0) cat(paste(format(counter, scientific = F), "lines processed...\n"))
+    if((counter %% (nToRead*100)) == 0) cat(paste0(format(counter/1000000, scientific = F), "M lines processed...\n"))
 #    if (length(line) < ) break
   }
   close(con)

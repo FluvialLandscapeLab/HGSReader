@@ -18,16 +18,19 @@ formatZoneVariable = function(x) {
   UseMethod("formatZoneVariable")
 }
 
+#' @export
 formatZoneVariable.default = function(x) {
   return(x)
 }
 
+#' @export
 formatZoneVariable.VARSHARELIST = function(x) {
   #strip the leading and trailing brackets and convert to a vector.
   x = gsub("[][()]", "", x)
   as.numeric(unlist(strsplit(x, ",")))
 }
 
+#' @export
 formatZoneVariable.VARLOCATION = function(x) {
   #strip the leading and trailing parentheses.
   x = gsub("[()]", "", x)

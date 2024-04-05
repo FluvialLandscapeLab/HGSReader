@@ -56,7 +56,9 @@
 #'   CELLCENTERED.
 #'
 #' @export
-HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = NULL, includeCoords = F, asArray = T) {
+HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = NULL, includeCoords = T, asArray = F) {
+
+#  if(asArray) stop("`asArray = TRUE` is no longer supported.  Convert an HGS.data.frame to an array using `as.array()` function")
 
   # a few checks of parameters
   if(anyDuplicated(names(HGSFile$blocks))) stop("HGSFile object contains the same solution time for more than one block.")
@@ -101,7 +103,7 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
   if (!(varLocs %in% getOption("HGSVariableLocations"))) stop("Unexpected variable location: ", VarLocs, ".  If this error is repeatable, contact the package developer.")
 
   # Add X, Y, Z to variable lists if includeCoords =  T and remove duplicates
-  if(includeCoords) variables = c(variables, getOption("HGSCoordVars"))
+  if(includeCoords) variables = c(getOption("HGSCoordVars"), variables)
   variables = unique(variables)
 
   # from the check, above, we know that all variables have the same location.
@@ -143,17 +145,8 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
   for(i in unique(readLocs$requestGroup[readLocs$requestGroup > 1])) {
     readLocs$skipBetween[which(readLocs$requestGroup == i)[1]] = readLocs$skipBetween[which(readLocs$requestGroup == i)[1]] + groupSkipBetween[i-1]
   }
-  # make an empty list to hold each sections of data.
-  dataBlocks = vector(mode = "list", nrow(readLocs))
 
-  # now scan the file once from top to bottom using the relative skip and read
-  # lengths
-  inFile = file(HGSFile$fileInfo$path, open = "r")
-  for(i in 1:nrow(readLocs)) {
-    dataBlocks[[i]] = scan(inFile, skip = readLocs$skipBetween[i], nlines = readLocs$nlines[i], quiet = T)
-    print(paste("Reading data location", i, "of", nrow(readLocs)))
-  }
-  close(inFile)
+  dataBlocks = getDataBlocks(HGSFile$fileInfo$path, readLocs)
 
   # if the variables are cellCentered, calculate the XYZ values for cell centers.
   if (cellCentered & includeCoords) {
@@ -170,7 +163,7 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
           #     b = seq(1, length(tElementNodes), 8),
           #     e = seq(8, length(tElementNodes), 8)
           #   )
-          .rowMeans(vals[HGSF$elementNodes], nrow(HGSF$elementNodes), ncol(HGSF$elementNodes))
+          .rowMeans(vals[HGSFile$elementNodes], nrow(HGSFile$elementNodes), ncol(HGSFile$elementNodes))
           #structure(data.frame(t(means)), names = c("X", "Y", "Z"))
         }
       )
@@ -203,57 +196,76 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
       }
     )
 
-  if (!asArray){
-      print("Assembling data.frame...")
-      if(cellCentered) {
-        requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), CellID = 1:prod(HGSFile$modelDim-1), df), requestedData, solutionTimes)
-      } else {
-        requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), NodeID = 1:prod(HGSFile$modelDim), df), requestedData, solutionTimes)
-      }
-    #}
-    requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
-    class(requestedData) = c("HGS.data.frame", "data.frame")
+#  if (!asArray){
+  print("Assembling data.frame...")
+  if(cellCentered) {
+    requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), CellID = 1:nrow(df), df), requestedData, solutionTimes)
   } else {
-    print("Assembling data cube...")
-    requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
-
-    # subtract 1 from all model dimensions if CELLCENTERED data
-    modelDim = HGSFile$modelDim - ifelse(cellCentered, 1, 0)
-    # add dimensions for variable names and time
-    modelDim = c(modelDim, length(solutionTimes), length(variables)+1)
-    names(modelDim) = getOption("HGSCubeDimLabels")[c("x", "y", "z", "time", "var")]
-    # add names for the variables, including "NodeID" or "CellID"
-    dimNames =
-      list(
-        1:modelDim[getOption("HGSCubeDimLabels")["x"]],
-        1:modelDim[getOption("HGSCubeDimLabels")["y"]],
-        1:modelDim[getOption("HGSCubeDimLabels")["z"]],
-        solutionTimes,
-        c(unname(ifelse(cellCentered, "CellID", "NodeID")), variables)
-      )
-    names(dimNames) = names(modelDim)
-    # convert data.frame to array with dimensions X, Y, Z, vars.
-    requestedData =
-      array(
-        c(
-          #the "rep" makes a repeating list of CellIDs or NodeIDs.  Each X, Y,
-          #and Z has a unique ID; the list is repped for each variable and time
-          #so the array is filled properly.
-          rep(1:prod(modelDim[1:3]), modelDim[4]),
-          unlist(requestedData, use.names = F)
-        ),
-        dim = modelDim,
-        dimnames = dimNames
-      )
-    class(requestedData) = c("HGSCube", "HGSArray")
-
+    requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), NodeID = 1:nrow(df), df), requestedData, solutionTimes)
   }
+  #}
+  requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
+  class(requestedData) = c("HGS.data.frame", "data.frame")
+  # } else {
+  #   print("Assembling data cube...")
+  #   requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
+  #
+  #   # subtract 1 from all model dimensions if CELLCENTERED data
+  #   modelDim = HGSFile$modelDim - ifelse(cellCentered, 1, 0)
+  #   # add dimensions for variable names and time
+  #   modelDim = c(modelDim, length(solutionTimes), length(variables)+1)
+  #   names(modelDim) = getOption("HGSCubeDimLabels")[c("x", "y", "z", "time", "var")]
+  #   # add names for the variables, including "NodeID" or "CellID"
+  #   dimNames =
+  #     list(
+  #       1:modelDim[getOption("HGSCubeDimLabels")["x"]],
+  #       1:modelDim[getOption("HGSCubeDimLabels")["y"]],
+  #       1:modelDim[getOption("HGSCubeDimLabels")["z"]],
+  #       solutionTimes,
+  #       c(unname(ifelse(cellCentered, "CellID", "NodeID")), variables)
+  #     )
+  #   names(dimNames) = names(modelDim)
+  #   # convert data.frame to array with dimensions X, Y, Z, vars.
+  #   requestedData =
+  #     array(
+  #       c(
+  #         #the "rep" makes a repeating list of CellIDs or NodeIDs.  Each X, Y,
+  #         #and Z has a unique ID; the list is repped for each variable and time
+  #         #so the array is filled properly.
+  #         rep(1:prod(modelDim[1:3]), modelDim[4]),
+  #         unlist(requestedData, use.names = F)
+  #       ),
+  #       dim = modelDim,
+  #       dimnames = dimNames
+  #     )
+  #   class(requestedData) = c("HGSCube", "HGSArray")
+  #
+  # }
 
   moreAttrs = getOption("HGSDataAttributes")
   for (i in 1:length(moreAttrs)) {
     attr(requestedData, names(moreAttrs)[i]) = eval(parse(text = moreAttrs[i]))
   }
+  if(asArray) requestedData <- as.array(requestedData)
   requestedData
+}
+
+# readLocs is a data.frame that contains columns "skipBetween" and "nlines" and
+# on record for each block to read.
+getDataBlocks <- function(filePath, readLocs) {
+  # make an empty list to hold each sections of data.
+  dataBlocks = vector(mode = "list", nrow(readLocs))
+
+  # now scan the file once from top to bottom using the relative skip and read
+  # lengths
+  inFile = file(filePath, open = "r")
+  for(i in 1:nrow(readLocs)) {
+    dataBlocks[[i]] = scan(inFile, skip = readLocs$skipBetween[i], nlines = readLocs$nlines[i], quiet = T)
+    print(paste("Reading data location", i, "of", nrow(readLocs)))
+  }
+  close(inFile)
+
+  dataBlocks
 }
 
 #' Convert HGSArray to a data.frame
@@ -298,11 +310,15 @@ as.data.frame.HGSArray = function(x) {
       names = c(unname(getOption("HGSCubeDimLabels")["time"]), vars)
     )
 
+  x = x[complete.cases(x),]
+  attr(x, "row.names") <- 1:nrow(x)
+
   # if NodeID or CellID column exists, convert it to integer.
   idx = which(names(x) %in% c("NodeID", "CellID"))
   if(length(idx) == 1) x[[idx]] = as.integer(x[[idx]])
 
   # copy the HGSDataAttributes from the input HGSArray.
+  class(x) = c("HGS.data.frame", class(x))
   attributes(x) = c(attributes(x), xAttr[names(getOption("HGSDataAttributes"))])
 
   # determine if one of the variables in the HGSArray is a NodeID or CellID, and
@@ -313,7 +329,6 @@ as.data.frame.HGSArray = function(x) {
   #   result[IDVar] = NULL
   # }
 
-  class(x) = c("HGS.data.frame", class(x))
   x
 }
 
@@ -398,4 +413,106 @@ skipAhead = function(con, n, chunk = 10000) {
     }
   }
   return(success)
+}
+
+#' @export
+as.array.HGS.data.frame <- function(x) {
+
+  # Get the names of the dimensions
+  dimNms = getOption("HGSCubeDimLabels")
+  dimNames = unname(dimNms)
+
+  HGSAttr =
+    sapply(
+      names(getOption("HGSDataAttributes")),
+      function(a) attr(x, a),
+      simplify = F)
+
+  varLevels = names(x)[names(x) != dimNames[[4]]]
+
+  if(any(!dimNames[-5] %in% names(x)))
+    stop("The following columns must be included in the data.frame: '",
+         paste(dimNames[-5], collapse = "', '"), "'.")
+  if(all(names(x) %in% dimNames[-5]))
+    stop("There must at least one data column other than ",
+         paste(dimNames[-5], collapse = "', '"),
+         "' in the data.frame.")
+
+  # determine x and y indexes for ordered sets of x and y values.
+  for(i in 1:2) {
+    # make a data.frame of unique values for each dimension
+    idx_df <-
+      x[[dimNames[i]]] %>%
+      unique() %>%
+      sort() %>%
+      data.frame(., 1:length(.))
+
+    names(idx_df) <- c(dimNames[i], paste0(names(dimNms[i]), "_idx"))
+
+    # join it to x
+    x <-
+      lapply(
+        split(tibble::as_tibble(x), x$Time),
+        function(x,y) dplyr::inner_join(x,y,by=names(x)[names(x) %in% names(y)]),
+        idx_df) %>%
+      do.call(rbind, .)
+  }
+
+  # add the z indexes
+  x <-
+    x %>%
+    # order by z value
+    dplyr::arrange(dplyr::across(dimNames[3])) %>%
+    # group by x and y
+    dplyr::group_by(dplyr::across(dimNames[c(1:2,4)])) %>%
+    # row numbers are z index
+    dplyr::mutate(z_idx = dplyr::row_number())
+
+  # unique values for each dimension
+  idxList <-
+    x[ , c("x_idx", "y_idx", "z_idx", dimNames[4])] %>%
+    apply(2, function(x) sort(unique(x)), simplify = F)
+
+  # dimensions of 5D array
+  dims =
+    c(
+      sapply(idxList, length),
+      Var = ncol(x) - 4
+    )
+
+  x <-
+    # get all combinations of all dimensions
+    idxList %>%
+    expand.grid() %>%
+    # join to x to get NAs in right place
+    dplyr::left_join(x, by = names(.)[names(.) %in% names(x)]) %>%
+    # every x index has an x value, so replace NAs for X value
+    dplyr::group_by(x_idx) %>%
+    dplyr::mutate(
+      across(dimNames[1], \(.x) unique(sort(.x)) %>% ifelse(length(.) == 0, NA, .))) %>%
+    # every y index has a y value, so replace NAs with Y value
+    dplyr::group_by(y_idx) %>%
+      dplyr::mutate(
+      across(dimNames[2], \(.x) unique(sort(.x)) %>% ifelse(length(.) == 0, NA, .))) %>%
+    # pivot value into rows
+    tidyr::pivot_longer(cols = -c("x_idx", "y_idx", "z_idx", dimNames[4]), names_to = "Var") %>%
+    dplyr::mutate(Var = factor(Var, levels = varLevels)) %>%
+    # arrange into order for filling 5D array
+    dplyr::arrange(dplyr::across(c(dimNames[5:4], "z_idx", "y_idx", "x_idx")))
+
+  # get the variable names
+  idxList = c(idxList, list(Var = levels(x$Var)))
+  names(idxList) = dimNames
+  names(dims) = dimNames
+
+  # make the 5D array
+  x <-
+    array(
+      data = x$value,
+      dim = dims,
+      dimnames = idxList)
+
+  class(x) = c("HGSCube", "HGSArray")
+  attributes(x) = c(attributes(x), HGSAttr)
+  x
 }

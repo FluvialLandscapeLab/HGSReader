@@ -4,8 +4,14 @@
 \alias{HGSGetData}
 \title{Get data values from HGS files}
 \usage{
-HGSGetData(HGSFile, variables, blockNumbers = NULL,
-  solutionTimes = NULL, includeCoords = F, asArray = T)
+HGSGetData(
+  HGSFile,
+  variables,
+  blockNumbers = NULL,
+  solutionTimes = NULL,
+  includeCoords = T,
+  asArray = F
+)
 }
 \arguments{
 \item{HGSFile}{An S3 object of class "HGSFile" created by calling

@@ -8,4 +8,7 @@ Description: The model HydroGeoSphere creates complex output files that are diff
 License: MIT
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 6.1.1
+RoxygenNote: 7.3.1
+Imports: 
+    dplyr,
+    tidyr

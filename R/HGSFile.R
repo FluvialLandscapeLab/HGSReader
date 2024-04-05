@@ -111,6 +111,7 @@ HGSReadFile = function(x) {
   UseMethod("HGSReadFile")
 }
 
+#' @export
 HGSReadFile.pm = function(x) {
   getTaggedLines(x, getTags(class(x)))
 }
@@ -120,6 +121,7 @@ HGSFileBody = function(x, taggedLines) {
   UseMethod("HGSFileBody")
 }
 
+#' @export
 HGSFileBody.pm = function(x, taggedLines) {
   #names of columns that should be included in the DATAMAP; note that the first
   #to values must be for "skip" and "nline" in "scan()" function.
@@ -140,18 +142,37 @@ HGSFileBody.pm = function(x, taggedLines) {
 
   #calculate the number of lines in each section of the file, based on the tagged lines
   taggedLines$nlines = c(taggedLines$line[2:nrow(taggedLines)], fileEnd) - taggedLines$line - 1
-  #grab the data necessary to lookup the node ids for each element.  This gets
+  #grab the data necessary to determine the dims and node ids for each element.  This gets
   #the "line" and "nlines" values for the "nodes" record in taggedLines,
   #converts them to a vector, and renames the values according the the names in mapColumns.
-  elementNodes =
-    structure(
-      as.integer(taggedLines[subset$nodes,mapColumns[1:2]]),
-      names = names(mapColumns[1:2])
-    )
-  #now use the info in elementNodes to read the element nodes from the file.
-  elementNodes = scan(file = x, skip = elementNodes["skip"], nlines = elementNodes["nlines"], quiet = T)
-  elementNodes = matrix(elementNodes, ncol = 8, byrow = T)
+  readLocs = taggedLines[taggedLines$tag == "nodes" | taggedLines$text %in% c("x", "y"),]
 
+  if(nrow(readLocs) != 3) stop("Error in reading x, y, z, and node locations.  If this error is reproducable, contact the package developer.")
+
+  readLocs$skipBetween =
+    c(
+      readLocs$line[1],
+      readLocs$line[2:3] - (readLocs$line[1:2] + readLocs$nlines[1:2])
+    )
+
+  datablocks = getDataBlocks(x, readLocs)
+  # elementNodes =
+  #   structure(
+  #     as.integer(taggedLines[subset$nodes,mapColumns[1:2]]),
+  #     names = names(mapColumns[1:2])
+  #   )
+  # #now use the info in elementNodes to read the element nodes from the file.
+  # elementNodes = scan(file = x, skip = elementNodes["skip"], nlines = elementNodes["nlines"], quiet = T)
+
+  modelDim =
+    c(
+      X = length(unique(datablocks[[1]])),
+      Y = length(unique(datablocks[[2]])),
+      Z = length(datablocks[[1]])/nrow(unique(data.frame(x = datablocks[[1]], y = datablocks[[2]]))))
+
+  elementNodes = matrix(datablocks[[3]], ncol = 8, byrow = T)
+
+  rm(datablocks)
   #create a defaultDataMap from the first block of lines in subset$data.  Again,
   #the first lenght(vars) lines in subset$data contain a complete data set.
   #This will be used as a base data map for all blocks in subset$zone because
@@ -198,6 +219,9 @@ HGSFileBody.pm = function(x, taggedLines) {
 
   names(blocks) = as.character(sapply(blocks, `[[`, "SOLUTIONTIME"))
 
+  #### NOTE: This method of calculating dimensions is abandonded because
+  #### it only worked for blocks of data, not "worms" of data.
+
   # The following code determines the dimensions of the HGS space, assuming it's
   # rectangular.  In the rectangular mesh, all nodes are given a serial ID
   # starting at 1.  In plan view (x = left-right, y = up-down), ID=1 is in the
@@ -223,13 +247,14 @@ HGSFileBody.pm = function(x, taggedLines) {
   # the number of elements in the z dimensions is nElements/((xDim-1)*(yDim-1)).
   # Finally, the number of nodes in the zDim is 1 more than the number of
   # elements in the zDim.  WHEW!!!
-  FirstElementNodes = elementNodes[1,]
-  xDim = FirstElementNodes[4] - 1
-  yDim = (FirstElementNodes[5] - 1)/xDim
-  zDim = unname(nrow(elementNodes)/((xDim-1)*(yDim-1)) + 1)
+
+  # FirstElementNodes = elementNodes[1,]
+  # xDim = FirstElementNodes[4] - 1
+  # yDim = (FirstElementNodes[5] - 1)/xDim
+  # zDim = unname(nrow(elementNodes)/((xDim-1)*(yDim-1)) + 1)
 
   #return a list to be appended to the default file description (including fileinfo, description, and tagged lines)
-  list(variables = vars, elementNodes = elementNodes, modelDim = c(X = xDim, Y=yDim, Z = zDim), blocks = blocks)
+  list(variables = vars, elementNodes = elementNodes, blocks = blocks, modelDim = modelDim)
 }
 
 getTaggedLines = function(filepath = file.choose(), tags) {
@@ -256,7 +281,8 @@ getTaggedLines = function(filepath = file.choose(), tags) {
     #    lineText<<-line
 
     # see if the line starts with any of the line tags
-    isTagged = sapply(paste0("^", tags), grepl, x = line)
+    isTagged = sapply(paste0("^", tags), grepl, x = line) &
+      !grepl(" units: ", line)
     # if so, update the vectors of the data.frame
     if(any(isTagged)) {
       # which lines are tagged

@@ -111,7 +111,7 @@ HGSReadFile = function(x) {
   UseMethod("HGSReadFile")
 }
 
-#' @export
+#' @exportS3Method HGSReader::HGSReadFile
 HGSReadFile.pm = function(x) {
   getTaggedLines(x, getTags(class(x)))
 }
@@ -121,7 +121,7 @@ HGSFileBody = function(x, taggedLines) {
   UseMethod("HGSFileBody")
 }
 
-#' @export
+#' @exportS3Method HGSReader::HGSFileBody
 HGSFileBody.pm = function(x, taggedLines) {
   #names of columns that should be included in the DATAMAP; note that the first
   #to values must be for "skip" and "nline" in "scan()" function.
@@ -183,7 +183,7 @@ HGSFileBody.pm = function(x, taggedLines) {
   defaultVarLocation = rep("NODECENTERED", nrow(defaultDataMap))
 
 
-  # caluculate the contents of each block (except for the DATAMAP) by parsing
+  # calculate the contents of each block (except for the DATAMAP) by parsing
   # the subset$zones lines
   blocks = getVarLists(taggedLines$text[subset$zones])
 

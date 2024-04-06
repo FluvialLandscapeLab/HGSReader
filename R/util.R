@@ -1,3 +1,7 @@
+#' @importFrom dplyr %>%
+#' @export
+dplyr::`%>%`
+
 #' @export
 print.HGSFile = function(x) {
   cat("HGS file with ", length(x$blocks), " data block", ifelse(length(x$blocks)>1, "s", ""), "\n", sep = "")

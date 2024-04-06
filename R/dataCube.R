@@ -204,8 +204,12 @@ HGSGetData = function(HGSFile, variables, blockNumbers = NULL, solutionTimes = N
     requestedData = Map(function(df, time) data.frame(Time = as.numeric(time), NodeID = 1:nrow(df), df), requestedData, solutionTimes)
   }
   #}
-  requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
-  class(requestedData) = c("HGS.data.frame", "data.frame")
+  requestedData =
+    do.call(rbind, c(requestedData, list(make.row.names = F))) %>%
+    dplyr::as_tibble()
+  # to make attributes identical to results of as.data.frame.HGSArray
+  attributes(requestedData) <- attributes(requestedData)[sort(names(attributes(requestedData)))]
+  attr(requestedData, "class") = c("HGS.data.frame", class(requestedData))
   # } else {
   #   print("Assembling data cube...")
   #   requestedData = do.call(rbind, c(requestedData, list(make.row.names = F)))
@@ -268,18 +272,19 @@ getDataBlocks <- function(filePath, readLocs) {
   dataBlocks
 }
 
-#' Convert HGSArray to a data.frame
+#' Convert between HGSArray and HGS.data.frame
 #'
 #' Create a data.frame containing values from an HGSArray.
 #'
-#' @param x An HGSArray S3 object.
+#' @param x An HGSArray S3 object for as.data.frame.HGSArray.  An HGS.data.frame
+#'   object for as.array.HGS.data.frame.
 #'
-#' @return A data.frame where columns represent variables from the HGSArray.
-#'   Column names are variable names.  A "NodeID" or "CellID" variable in the
-#'   HGSArray, if present, is not included in the data.frame, but values are
-#'   used as row names the resulting data.frame.
+#' @return as.data.frame.HGSArray returns an HGS.data.frame where columns represent
+#'   variables from the HGSArray. Column names are variable names.
 #'
-#' @export
+#'   as.array.HGS.data.frame returns an HGSArray object representing the data
+#'   found in an HGS.data.frame.
+#' @exportS3Method base::as.data.frame
 as.data.frame.HGSArray = function(x) {
 
   xAttr = attributes(x)
@@ -308,17 +313,18 @@ as.data.frame.HGSArray = function(x) {
         )
       ),
       names = c(unname(getOption("HGSCubeDimLabels")["time"]), vars)
-    )
-
-  x = x[complete.cases(x),]
-  attr(x, "row.names") <- 1:nrow(x)
+    ) %>%
+    dplyr::as_tibble() %>%
+    tidyr::drop_na()
 
   # if NodeID or CellID column exists, convert it to integer.
   idx = which(names(x) %in% c("NodeID", "CellID"))
   if(length(idx) == 1) x[[idx]] = as.integer(x[[idx]])
+  attr(x, "row.names") <- x[[idx]]
 
   # copy the HGSDataAttributes from the input HGSArray.
-  class(x) = c("HGS.data.frame", class(x))
+  attr(x, "class") = c("HGS.data.frame", class(x))
+  attributes(x) <- attributes(x)[sort(names(attributes(x)))]
   attributes(x) = c(attributes(x), xAttr[names(getOption("HGSDataAttributes"))])
 
   # determine if one of the variables in the HGSArray is a NodeID or CellID, and
@@ -365,7 +371,7 @@ as.data.frame.HGSArray = function(x) {
   x
 }
 
-#' @export
+#' @exportS3Method base::print
 print.HGSArray = function(x, ...) {
 
   dN = dimnames(x)
@@ -415,7 +421,8 @@ skipAhead = function(con, n, chunk = 10000) {
   return(success)
 }
 
-#' @export
+#' @rdname as.data.frame.HGSArray
+#' @exportS3Method base::as.array
 as.array.HGS.data.frame <- function(x) {
 
   # Get the names of the dimensions

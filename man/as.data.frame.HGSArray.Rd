@@ -2,18 +2,23 @@
 % Please edit documentation in R/dataCube.R
 \name{as.data.frame.HGSArray}
 \alias{as.data.frame.HGSArray}
-\title{Convert HGSArray to a data.frame}
+\alias{as.array.HGS.data.frame}
+\title{Convert between HGSArray and HGS.data.frame}
 \usage{
 \method{as.data.frame}{HGSArray}(x)
+
+\method{as.array}{HGS.data.frame}(x)
 }
 \arguments{
-\item{x}{An HGSArray S3 object.}
+\item{x}{An HGSArray S3 object for as.data.frame.HGSArray.  An HGS.data.frame
+object for as.array.HGS.data.frame.}
 }
 \value{
-A data.frame where columns represent variables from the HGSArray.
-  Column names are variable names.  A "NodeID" or "CellID" variable in the
-  HGSArray, if present, is not included in the data.frame, but values are
-  used as row names the resulting data.frame.
+as.data.frame.HGSArray returns an HGS.data.frame where columns represent
+  variables from the HGSArray. Column names are variable names.
+
+  as.array.HGS.data.frame returns an HGSArray object representing the data
+  found in an HGS.data.frame.
 }
 \description{
 Create a data.frame containing values from an HGSArray.

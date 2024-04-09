@@ -348,11 +348,14 @@ as.data.frame.HGSArray = function(x) {
 #' @export
 `[.HGSArray` = function(x, ..., drop = T) {
 
+  # store the attributes of x
+  xAttr = attributes(x)
+
   if(!drop) {
     x = NextMethod()
+    # keep any attributes that were dropped by `[` -- in particular, the class
+    attributes(x) = c(attributes(x), xAttr[!(names(xAttr) %in% names(attributes(x)))])
   } else {
-    # store the attributes of x
-    xAttr = attributes(x)
 
     # Find demensions that will be dropped, which are those where the dimension length is 1 when drop = F.
 #    newAttr = attributes(unclass(x)[..., drop = F])

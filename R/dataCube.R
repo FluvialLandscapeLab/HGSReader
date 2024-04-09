@@ -319,8 +319,10 @@ as.data.frame.HGSArray = function(x) {
 
   # if NodeID or CellID column exists, convert it to integer.
   idx = which(names(x) %in% c("NodeID", "CellID"))
-  if(length(idx) == 1) x[[idx]] = as.integer(x[[idx]])
-  attr(x, "row.names") <- x[[idx]]
+  if(length(idx) == 1) {
+    x[[idx]] = as.integer(x[[idx]])
+    attr(x, "row.names") <- x[[idx]]
+  }
 
   # copy the HGSDataAttributes from the input HGSArray.
   attr(x, "class") = c("HGS.data.frame", class(x))
@@ -338,7 +340,6 @@ as.data.frame.HGSArray = function(x) {
   x
 }
 
-
 #' @export
 `[.HGSCube` = function(x, ..., drop = T) {
   class(x) = class(x)[class(x) != "HGSCube"]
@@ -350,6 +351,7 @@ as.data.frame.HGSArray = function(x) {
 
   # store the attributes of x
   xAttr = attributes(x)
+  class(x) = class(x)[class(x) != "HGSArray"]
 
   if(!drop) {
     x = NextMethod()
